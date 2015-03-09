@@ -4,24 +4,34 @@
 #(c) the Moran's I of the data.
 
 
-library(sp)
-library(spdep)
+library(RandomFields)
 
-#Generate an arbitrary 10x10 grid.
-gt <- GridTopology(c(0.5, 0.5), c(1, 1), c(10,10))
-SP <- as(as(SpatialGrid(gt), "SpatialPixels"), "SpatialPolygons")
-class(SP)
-plot(SP, axes=TRUE) 
+#Set a seed so we get the same realization each time..
+RFoptions(seed=1602)
 
-#Define the weights matrix - simple queens (touching neighbors)
-#Results in 684 nonzero links (out of 10,000 possible)
-ex.nb <- poly2nb(SP, queen=TRUE)
-#Note the style=W standardizes weights for each unit predicated on the number of
-#neighbors, so weights always sum to 1 for an observation.  "B" allows for binary 1/0 instead.
-ex.W <- nb2listw(ex.nb, style="W")
+#Using an Gaussian model with exponential spatial covariance
+model <- RMexp()
 
-#Data Generation Process will eventually be here..
-# set.seed(1)
-# SP10 <- SP[sample(length(slot(SP, "polygons")), 10)]
-# class(SP10)
-# plot(SP10, col="green", add=TRUE) 
+#How big the field will be
+x <- seq(0, 10, 1)
+
+#Simulate the field (n is number of fields we want.  Here we create 2.)
+#These represent an example "outcome", and "control".
+z <- RFsimulate(model, x, x, n=2)
+dev.off()
+plot(z)
+z.SPDF <- as(z, 'SpatialPointsDataFrame')
+
+#We also want to simulate a binary treatment, which we do below. 
+#Same dimensions, and predicated on the same RMexp model.
+#Note this simply takes any values >0 and recodes them as a 1,
+#where values are a product of the RMexp() model.
+model <- RPbernoulli((model))
+
+#treatment binary.
+t <- RFsimulate(model, x, x, n=1)
+dev.off()
+plot(t)
+t.SPDF <- as(t, 'SpatialPointsDataFrame')
+
+f.SPDF <- merge(t,z)
