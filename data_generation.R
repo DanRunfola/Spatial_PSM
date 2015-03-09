@@ -5,6 +5,7 @@
 
 
 library(RandomFields)
+require(sp)
 
 #Set a seed so we get the same realization each time..
 RFoptions(seed=1602)
@@ -13,14 +14,14 @@ RFoptions(seed=1602)
 model <- RMexp()
 
 #How big the field will be
-x <- seq(0, 10, 1)
+x <- seq(1, 10, 1)
 
 #Simulate the field (n is number of fields we want.  Here we create 2.)
 #These represent an example "outcome", and "control".
-z <- RFsimulate(model, x, x, n=2)
+z <- RFsimulate(model, x, x, n=4)
 dev.off()
 plot(z)
-z.SPDF <- as(z, 'SpatialPointsDataFrame')
+z.SPDF <- as(z, 'SpatialPolygonsDataFrame')
 
 #We also want to simulate a binary treatment, which we do below. 
 #Same dimensions, and predicated on the same RMexp model.
@@ -32,6 +33,18 @@ model <- RPbernoulli((model))
 t <- RFsimulate(model, x, x, n=1)
 dev.off()
 plot(t)
-t.SPDF <- as(t, 'SpatialPointsDataFrame')
+t.SPDF <- as(t, 'SpatialPolygonsDataFrame')
 
-f.SPDF <- merge(t,z)
+f.SPDF = z.SPDF
+f.SPDF@data[5:7]=data.frame(t.SPDF)
+
+#Rename the Variables for Later Interpretation
+colnames(f.SPDF@data)[1] <- "Outcome_T1"
+colnames(f.SPDF@data)[2] <- "Outcome_T2"
+colnames(f.SPDF@data)[3] <- "Control_T1"
+colnames(f.SPDF@data)[4] <- "Control_T2"
+colnames(f.SPDF@data)[5] <- "Treatment_Binary"
+
+spplot(f.SPDF[1:5])
+
+
