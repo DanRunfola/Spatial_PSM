@@ -81,6 +81,12 @@ colnames(f.SPDF@data)[5] <- "Treatment"
 
 f.SPDF@data["Treatment"] = f.SPDF@data["ControlA"] + f.SPDF@data["RandomFieldA"]
 
+#Scale data to calculate treatment binary.
+f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
+
+#Convert the Treatment to a Binary
+f.SPDF@data$Treatment[which(f.SPDF@data$Treatment => 0)] <- 1 
+f.SPDF@data$Treatment[which(f.SPDF@data$Treatment < 0)] <- 0 
 spplot(f.SPDF[1:5])
 
 #--------------------------------------------------------------------------
@@ -91,7 +97,8 @@ spplot(f.SPDF[1:5])
 #Neighbor is "queens", or any touching unit at one lag.
 f.NB = poly2nb(f.SPDF)
 f.W = nb2listw(f.NB, style='W')
-#Scale all data to standard deviations from mean for easy comparison later
+
+#Re-scale data (Treatment Binary to SD; note oddity in interpretation**)
 f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
 
 #yiA = intercept + (Theta * Treatment) + (Beta * Control (time 2, for now))
