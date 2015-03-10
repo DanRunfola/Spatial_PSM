@@ -41,9 +41,6 @@ if(cov_spatial_effects == 1)
   z <- RFsimulate(model, x, x, n=4)
   z.SPDF <- as(z, 'SpatialPolygonsDataFrame')
   
-  #If you want to define the treatment as a binary, uncomment this line.
-  #model <- RPbernoulli((model))
-
   t <- RFsimulate(model, x, x, n=1)
   t.SPDF <- as(t, 'SpatialPolygonsDataFrame')
   
@@ -73,21 +70,23 @@ if(cov_spatial_effects == 0)
 }
 
 #Rename the Variables for Later Interpretation
-colnames(f.SPDF@data)[1] <- "ControlA_T1"
-colnames(f.SPDF@data)[2] <- "ControlA_T2"
-colnames(f.SPDF@data)[3] <- "ControlB_T1"
-colnames(f.SPDF@data)[4] <- "ControlB_T2"
+colnames(f.SPDF@data)[1] <- "ControlA"
+colnames(f.SPDF@data)[2] <- "RandomFieldA"
+colnames(f.SPDF@data)[3] <- "ControlB"
+colnames(f.SPDF@data)[4] <- "RandomFieldB"
 colnames(f.SPDF@data)[5] <- "Treatment"
+
+#Redefine our Treatment as contingent upon a control and a random field.
+
+
+f.SPDF@data["Treatment"] = f.SPDF@data["ControlA"] + f.SPDF@data["RandomFieldA"]
+
 spplot(f.SPDF[1:5])
 
 #--------------------------------------------------------------------------
-#Raw data generation (initiatlized surfaces) complete.
-#Constructing weights matrices and creating data from a SLRM now.
+#Constructing weights matrices and creating data from SLRM
+#--------------------------------------------------------------------------
 
-#Biggest concerns: (a) not sure what modules to use for spatio-temporal regressions;
-#(b) I do not incorporate temporal autocorrelation into any of my spatial fields, now.
-#Calculate Spatial Weights Matrix
-#Very basic assumptions here -
 #Neighbor weights sum to 1 for each unit (style=W) to avoid oddities in edge cases, 
 #Neighbor is "queens", or any touching unit at one lag.
 f.NB = poly2nb(f.SPDF)
@@ -95,26 +94,42 @@ f.W = nb2listw(f.NB, style='W')
 #Scale all data to standard deviations from mean for easy comparison later
 f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
 
-#follow a two-step functional form:
-#yiB = yiA + (pWyA) 
-
 #yiA = intercept + (Theta * Treatment) + (Beta * Control (time 2, for now))
-yiAfunc <- function(a, b) (0.0+(1.0*a)+(0.5*b))
-f.SPDF@data["yiA"] = apply(f.SPDF@data[,c('Treatment','ControlA_T2')], 1, function(y) yiAfunc(y['Treatment'],y['ControlA_T2']))
+yiAfunc <- function(a, b) (0.0+(1.0*a)+(1.0*b))
+f.SPDF@data["yiA"] = apply(f.SPDF@data[,c('Treatment','ControlA')], 1, function(y) yiAfunc(y['Treatment'],y['ControlA']))
 
 #Test the Moran's I.  At this stage, it should always be close to 0 and not significant.
-#This is because the current model is predicated entirely on random data.
 moran.test(f.SPDF@data[,6], f.W)
 
 #Re-standardize the new yiA
 f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
 
-#Now, we want to add in spatial effects.
-#First, we need to calculate the lagged y variable (from our initial estimation of yiA)
+#Calculate the lagged y variable (from our initial estimation of yiA)
 yiA_lag <- lag.listw(f.W, f.SPDF@data$yiA)
 f.SPDF@data[7]=data.frame(yiA_lag)
 
 #Now, we add our yiA to the weighted yiA lag term.
-#the rho value for the lag term is set equal to 0.5
-yiBfunc <- function(a, b) (a + (0.5 * b))
+#the rho value for the lag term is randomized to test for 
+#different degrees of spatial correlation.
+#Uniform sampling between 0.1 and 10 for rho.
+rho = runif(1,0.1,10)
 
+yiBfunc <- function(a, b) (a + (rho * b))
+f.SPDF@data["yiB"] = apply(f.SPDF@data[,c('yiA','yiA_lag')], 1, function(y) yiBfunc(y['yiA'],y['yiA_lag']))
+
+#Re-standardize the new yiB
+f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
+spplot(f.SPDF[6:8])
+
+#New Moran's test - for higher values of rho, this should be closer to 1 and significant.
+moran.test(f.SPDF@data[,8], f.W)
+
+#--------------------------------------------------------------------------
+#PSM
+#--------------------------------------------------------------------------
+
+#Fit a simple linear model to predict the treatment based on our control variable.
+PSM_model <- lm(Treatment ~ ControlA, f.SPDF@data)
+
+plot(f.SPDF@data$Treatment, f.SPDF@data$ControlA)
+abline(PSM_model)
