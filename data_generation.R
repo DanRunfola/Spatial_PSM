@@ -13,6 +13,7 @@
 library(RandomFields)
 library(sp)
 library(spdep)
+library(psych)
 
 #User Settings
 #Generate a random field with spatial effects in Covariates 
@@ -85,7 +86,8 @@ f.SPDF@data["Treatment"] = f.SPDF@data["ControlA"] + f.SPDF@data["RandomFieldA"]
 f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
 
 #Convert the Treatment to a Binary
-f.SPDF@data$Treatment[which(f.SPDF@data$Treatment => 0)] <- 1 
+f.SPDF@data$Treatment[which(f.SPDF@data$Treatment > 0)] <- 1 
+f.SPDF@data$Treatment[which(f.SPDF@data$Treatment == 0)] <- 1 
 f.SPDF@data$Treatment[which(f.SPDF@data$Treatment < 0)] <- 0 
 spplot(f.SPDF[1:5])
 
@@ -140,3 +142,8 @@ PSM_model <- lm(Treatment ~ ControlA, f.SPDF@data)
 
 plot(f.SPDF@data$Treatment, f.SPDF@data$ControlA)
 abline(PSM_model)
+
+#Need to save fitted PSM results...
+
+#Pre PSM Balance
+describeBy(f.SPDF@data, group=f.SPDF@data$Treatment)
