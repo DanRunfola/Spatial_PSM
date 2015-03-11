@@ -10,10 +10,11 @@
 #install.packages("RandomFields") - how to install a library you're missing.  Only done once, just like
 #a module in STATA.
 
-library(RandomFields)
-library(sp)
-library(spdep)
-library(psych)
+library(RandomFields) #Generating Random Spatial Fields
+library(sp)    #Spatial data handling
+library(spdep) #Spatial Lag Model Fitting
+library(psych) #Helps with comparing by groups
+library(FNN) #Nearest Neighbor Classifications
 
 #User Settings
 #Generate a random field with spatial effects in Covariates 
@@ -138,12 +139,81 @@ moran.test(f.SPDF@data[,8], f.W)
 #--------------------------------------------------------------------------
 
 #Fit a simple linear model to predict the treatment based on our control variable.
+#Note 1: Reconstruct our Treatment as a Binary, for interpretation.
+#Note 2: Standard Error tests are invalid for the PSM.  I don't believe this matters, 
+#As we are interested in the predictive power of ancillary for inclusion in the treatment.
+#Check on this assumption.  Could easily swap for probit or logit.
+
+
+#Convert the Treatment to a Binary 0/1
+f.SPDF@data$Treatment[which(f.SPDF@data$Treatment > 0)] <- 1 
+f.SPDF@data$Treatment[which(f.SPDF@data$Treatment == 0)] <- 1 
+f.SPDF@data$Treatment[which(f.SPDF@data$Treatment < 0)] <- 0 
+
 PSM_model <- lm(Treatment ~ ControlA, f.SPDF@data)
 
-plot(f.SPDF@data$Treatment, f.SPDF@data$ControlA)
-abline(PSM_model)
+#plot(f.SPDF@data$Treatment, f.SPDF@data$ControlA)
+#abline(PSM_model)
 
 #Need to save fitted PSM results...
+f.SPDF@data["PSM"] <- predict(PSM_model, f.SPDF@data)
 
 #Pre PSM Balance
 describeBy(f.SPDF@data, group=f.SPDF@data$Treatment)
+
+#Run a KNN - for later editing this is a custom-coded of a KNN without replacement.
+#Threshold Value for KNN can be set at any arbitrary distance value,
+#where distance is the PSM fit difference (un-standardized)
+
+#Create a new version of the f.SPDF data frame which records only matched pairs.
+#Further, add a column to keep track of the matches.
+m.SPDF = f.SPDF
+m.SPDF$match = 0
+
+#add an ID column to track matches in the m.SPDF frame, and to remove from f.SPDF  
+m.SPDF$PSM_ID <- seq_len(nrow(m.SPDF))
+f.SPDF$PSM_ID <- seq_len(nrow(f.SPDF))
+
+#add a distance column to track the PSM distance for later analysis
+m.SPDF$PSM_distance <- -1
+
+Treatment_n = length(f.SPDF@data$Treatment[which(f.SPDF@data$Treatment == 1)])
+Control_n = length(f.SPDF@data$Treatment[which(f.SPDF@data$Treatment == 0)])
+cnt = min(Treatment_n, Control_n)
+
+#Loop through all treatment cases to find a match.
+for (j in 1:cnt)
+{
+  
+  #Run the KNN for all neighbors.  We want to optimize the total distance between PSM (treatment, control) 
+  #to be as low as possible.  Thus, we run the full set, choose the lowest distance, drop both pairs, repeat.
+  k <- get.knnx(f.SPDF@data$PSM[which(f.SPDF@data$Treatment == 1)], f.SPDF@data$PSM[which(f.SPDF@data$Treatment == 0)], 1)
+  #print(k)
+  
+  #Add the matched treatment and control values to the m.SPDF data frame
+  best_m = as.matrix(apply(k$nn.dist, 2, which.min))[1]
+ 
+  #Control PSM ID
+  Control_ID = f.SPDF@data$PSM_ID[which(f.SPDF@data$Treatment == 0)][as.matrix(apply(k$nn.dist, 2, which.min))[1]]
+
+  
+  #Treatment PSM ID
+  k_match_id = k[[1]][best_m]
+  Treatment_ID = f.SPDF@data$PSM_ID[which(f.SPDF@data$Treatment == 1)][k_match_id]
+
+  
+  #Add the Treatment ID to the Control Row and Record the distance between pairs
+  m.SPDF@data$match[which(m.SPDF@data$PSM_ID == Control_ID)] = Treatment_ID
+  m.SPDF@data$PSM_distance[which(m.SPDF@data$PSM_ID == Control_ID)] = k[[2]][best_m]
+  
+  #Add the Control ID to the Treatment Row and Record the distance between pairs
+  m.SPDF@data$match[which(m.SPDF@data$PSM_ID == Treatment_ID)] = Control_ID
+  m.SPDF@data$PSM_distance[which(m.SPDF@data$PSM_ID == Treatment_ID)] = k[[2]][best_m]
+  
+  #Drop the paired match out of the f.SPDF matrix 
+  f.SPDF@data <- f.SPDF@data[f.SPDF@data$PSM_ID != Treatment_ID ,]
+  f.SPDF@data <- f.SPDF@data[f.SPDF@data$PSM_ID != Control_ID ,]
+}
+
+#Map the Matches
+
