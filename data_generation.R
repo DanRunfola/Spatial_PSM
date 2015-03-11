@@ -32,6 +32,9 @@ total_iterations = 1000
 #Do we create maps? 1 = Yes.
 maps = 0
 
+#Do we output plots and iteration counts?
+verbose = 0
+
 #----------------------------------
 #----------------------------------
 #Initialize the Data Frame
@@ -286,10 +289,14 @@ while (it_cnt < (total_iterations+1))
   dist.DF <- dist.DF[dist.DF$PSM_distance >0 ,]
   
   title = paste("Moran's I:",round(mI[[3]][[1]],3),"rho:",round(rho,3))
-  
-  plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
   dist_model <- lm(PSM_distance ~ Euclidean_distance, dist.DF)
-  abline(dist_model)
+  if(verbose == 1)
+  {
+    plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
+    abline(dist_model)
+  }
+  
+  
   
   #------------------------------
   #Balancing based on PSM distance
@@ -306,9 +313,14 @@ while (it_cnt < (total_iterations+1))
   describeBy(dist.DF, group=dist.DF$Treatment)
   
   #Plot it:
-  plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
   dist_model <- lm(PSM_distance ~ Euclidean_distance, dist.DF)
-  abline(dist_model)
+  if(verbose == 1)
+  {
+    plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
+    abline(dist_model)
+  }
+  
+  
   
   #In the DGN, both of beta's are equal to 1, with an intercept of 0.
   #use a linear model to estimate our beta in the NO lag case:
@@ -321,15 +333,8 @@ while (it_cnt < (total_iterations+1))
   Lag_Control_beta = summary(post_psm_model_Lag)[4][[1]][3]
   
   #final elements to record:
-  #Magnitude of rho relative to the beta on yiA (the non-lagged DGN)
-  print(rho)
-  
-  #Moran's I
-  print(mI[[3]][[1]])
-  
   #Different in Treatment Effect Beta's from lagged DGN
   BdifBhat = 1 - Lag_Treatment_beta
-  print (BdifBhat)
   
   BdifBhat_NL = 1 - noLag_Treatment_beta
   
@@ -343,14 +348,20 @@ while (it_cnt < (total_iterations+1))
   beta_df_NL["Morans_I"][it_cnt,] = mi_NL[[3]][[1]]
   
   it_cnt = it_cnt + 1
-  print("")
-  print("-------------")
-  print("Begin Iteration:")
-  print(it_cnt)
-  print("-------------")
+  if(verbose == 1)
+  {
+    print("")
+    print("-------------")
+    print("Begin Iteration:")
+    print(it_cnt)
+    print("-------------")
+  }
 }
 
-plot3d(beta_df)
-
-plot(beta_df$Morans_I, beta_df$BdifBhat)
-points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="red")
+if (verbose == 1)
+{
+  plot3d(beta_df)
+  
+  plot(beta_df$Morans_I, beta_df$BdifBhat)
+  points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="red")
+}
