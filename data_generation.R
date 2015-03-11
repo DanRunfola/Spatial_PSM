@@ -104,7 +104,7 @@ f.W = nb2listw(f.NB, style='W')
 #Re-scale data (Treatment Binary to SD; note oddity in interpretation**)
 f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
 
-#yiA = intercept + (Theta * Treatment) + (Beta * Control (time 2, for now))
+#yiA = intercept + (Theta * Treatment) + (Beta * ControlA)
 yiAfunc <- function(a, b) (0.0+(1.0*a)+(1.0*b))
 f.SPDF@data["yiA"] = apply(f.SPDF@data[,c('Treatment','ControlA')], 1, function(y) yiAfunc(y['Treatment'],y['ControlA']))
 
@@ -132,7 +132,7 @@ f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
 spplot(f.SPDF[6:8])
 
 #New Moran's test - for higher values of rho, this should be closer to 1 and significant.
-moran.test(f.SPDF@data[,8], f.W)
+mI = moran.test(f.SPDF@data[,8], f.W)
 
 #--------------------------------------------------------------------------
 #PSM
@@ -177,6 +177,9 @@ f.SPDF$PSM_ID <- seq_len(nrow(f.SPDF))
 #add a distance column to track the PSM distance for later analysis
 m.SPDF$PSM_distance <- -1
 
+#add a match pair so we can view what was matched with what.
+m.SPDF$PSM_match_ID <- -1
+
 Treatment_n = length(f.SPDF@data$Treatment[which(f.SPDF@data$Treatment == 1)])
 Control_n = length(f.SPDF@data$Treatment[which(f.SPDF@data$Treatment == 0)])
 cnt = min(Treatment_n, Control_n)
@@ -202,18 +205,98 @@ for (j in 1:cnt)
   Treatment_ID = f.SPDF@data$PSM_ID[which(f.SPDF@data$Treatment == 1)][k_match_id]
 
   
-  #Add the Treatment ID to the Control Row and Record the distance between pairs
+  #Add the Treatment ID to the Control Row and Record the distance / matchID between pairs
   m.SPDF@data$match[which(m.SPDF@data$PSM_ID == Control_ID)] = Treatment_ID
   m.SPDF@data$PSM_distance[which(m.SPDF@data$PSM_ID == Control_ID)] = k[[2]][best_m]
+  m.SPDF@data$PSM_match_ID[which(m.SPDF@data$PSM_ID == Control_ID)] = j
   
-  #Add the Control ID to the Treatment Row and Record the distance between pairs
+  #Add the Control ID to the Treatment Row and Record the distance / matchID between pairs
   m.SPDF@data$match[which(m.SPDF@data$PSM_ID == Treatment_ID)] = Control_ID
   m.SPDF@data$PSM_distance[which(m.SPDF@data$PSM_ID == Treatment_ID)] = k[[2]][best_m]
+  m.SPDF@data$PSM_match_ID[which(m.SPDF@data$PSM_ID == Treatment_ID)] = j
   
   #Drop the paired match out of the f.SPDF matrix 
   f.SPDF@data <- f.SPDF@data[f.SPDF@data$PSM_ID != Treatment_ID ,]
   f.SPDF@data <- f.SPDF@data[f.SPDF@data$PSM_ID != Control_ID ,]
+  
 }
 
 #Map the Matches
+sp.label <- function(x, label)
+{
+  list("sp.text", coordinates(x), label)
+}
+ISO.sp.label <- function(x)
+{
+  sp.label(x, x@data["PSM_match_ID"][[1]])
+}
+make.ISO.sp.label <- function(x)
+{
+  do.call("list", ISO.sp.label(x))
+}
+spplot(m.SPDF['PSM_distance'], sp.layout=make.ISO.sp.label(m.SPDF))
+
+#Calculate the Spatial Euclidean Distance for Each Pair to contrast to PSM NN distance.
+m.SPDF['Euclidean_distance'] <- -1
+for (j in 1:length(m.SPDF))
+{
+  #Select the pair
+  temp.SPDF <- m.SPDF
+  t.PSM_match_ID <- m.SPDF@data["PSM_match_ID"][[1]][j]
+  temp.SPDF@data <- m.SPDF@data[m.SPDF@data$PSM_match_ID == t.PSM_match_ID ,]
+  
+  #Calculate the distance
+  d.EUC = dist(temp.SPDF@data, method="euclidean")[[1]]
+  m.SPDF@data$Euclidean_distance[[j]] <- d.EUC
+  
+}
+
+dist.DF <- m.SPDF@data
+dist.DF <- dist.DF[dist.DF$PSM_distance >0 ,]
+
+title = paste("Moran's I:",round(mI[[3]][[1]],3),"rho:",round(rho,3))
+
+plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
+dist_model <- lm(PSM_distance ~ Euclidean_distance, dist.DF)
+abline(dist_model)
+
+#------------------------------
+#Balancing based on PSM distance
+#Ludicrously simple for now, need to complicate:
+#Keep matches that are less than mean difference - may want to change this later.
+#------------------------------
+describe(dist.DF$PSM_distance)
+#median.PSM = median(dist.DF$PSM_distance)
+mean.PSM = describe(dist.DF$PSM_distance)[3][[1]]
+
+dist.DF <- dist.DF[dist.DF$PSM_distance < mean.PSM ,]
+
+#Check our new PSM Balance:
+describeBy(dist.DF, group=dist.DF$Treatment)
+
+#Plot it:
+plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
+dist_model <- lm(PSM_distance ~ Euclidean_distance, dist.DF)
+abline(dist_model)
+
+#In the DGN, both of beta's are equal to 1, with an intercept of 0.
+#use a linear model to estimate our beta in the NO lag case:
+post_psm_model_noLag = lm(yiA ~ Treatment + ControlA, dist.DF)
+noLag_Treatment_beta = summary(post_psm_model_noLag)[4][[1]][2]
+noLag_Control_beta = summary(post_psm_model_noLag)[4][[1]][3]
+
+post_psm_model_Lag = lm(yiB ~ Treatment + ControlA, dist.DF)
+Lag_Treatment_beta = summary(post_psm_model_Lag)[4][[1]][2]
+Lag_Control_beta = summary(post_psm_model_Lag)[4][[1]][3]
+
+#final elements to record:
+#Magnitude of rho relative to the beta on yiA (the non-lagged DGN)
+print(rho)
+
+#Moran's I
+print(mI[[3]][[1]])
+
+#Different in Treatment Effect Beta's from lagged DGN
+BdifBhat = 1 - Lag_Treatment_beta
+print (BdifBhat)
 
