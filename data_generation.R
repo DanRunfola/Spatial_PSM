@@ -27,7 +27,7 @@ cov_spatial_effects = 0
 x <- seq(1, 10, 1)
 
 #How many iterations to perform
-total_iterations = 1000
+total_iterations = 100000
 
 #Do we create maps? 1 = Yes.
 maps = 0
@@ -362,6 +362,6 @@ if (verbose == 1)
 {
   plot3d(beta_df)
   
-  plot(beta_df$Morans_I, beta_df$BdifBhat)
-  points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="red")
+  plot(beta_df$Morans_I, beta_df$BdifBhat, cex=.1)
+  points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="red", cex=.1)
 }
