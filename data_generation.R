@@ -3,7 +3,7 @@
 #(b) the data itself,
 #(c) the Moran's I of the data.
 
-#Small notes for Ariel:
+#Small notes:
 #View(f.SPDF@data)  - allows you to view (capital V) the attributes table within a shapefile, where
 #f.SPDF is the shapefile
 
@@ -24,10 +24,10 @@ library(rgl) #3D Scatterplots.  Note this requires X11 on Ubuntu, see below comm
 cov_spatial_effects = 0
 
 #How big the field will be
-x <- seq(1, 10, 1)
+x <- seq(1, 35, 1)
 
 #How many iterations to perform
-total_iterations = 100000
+total_iterations = 2500
 
 #Do we create maps? 1 = Yes.
 maps = 0
@@ -360,7 +360,7 @@ while (it_cnt < (total_iterations+1))
 
 if (verbose == 1)
 {
-  plot3d(beta_df)
+  plot3d(beta_df, cex=.1)
   
   plot(beta_df$Morans_I, beta_df$BdifBhat, cex=.1)
   points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="red", cex=.1)
