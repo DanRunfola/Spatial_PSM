@@ -19,21 +19,32 @@ library(rgl) #3D Scatterplots.  Note this requires X11 on Ubuntu, see below comm
 #sudo apt-get install libX11-dev freeglut3 freeglut3-dev
 
 #User Settings
-#Generate a random field with spatial effects in Covariates 
+#Generate a random field with spatial effects in Treatment and Covariates 
 #if 1, covariates have spatial effects.  If 0, completely random fields with no spatial effects.
-cov_spatial_effects = 0
+cov_spatial_effects = 1
 
 #How big the field will be
-x <- seq(1, 35, 1)
+x <- seq(1, 10, 1)
 
 #How many iterations to perform
-total_iterations = 2500
+total_iterations = 100
 
 #Do we create maps? 1 = Yes.
 maps = 0
 
 #Do we output plots and iteration counts?
 verbose = 0
+
+#Which PSM routine?
+#Options are:
+#lm - a traditional lm()
+#sl - a slrm with the weights matrix defined in the same way as the DGP.
+PSM_routine = "sl"
+OLS_PSM = 1
+Spatial_Lag_PSM = 0
+
+#Disable PSM dropping based on distance?
+PSM_drop_disab = 1
 
 #----------------------------------
 #----------------------------------
@@ -46,6 +57,18 @@ colnames(beta_df)[3] <- "Morans_I"
 beta_df_NL <- data.frame(matrix(ncol=2, nrow=total_iterations))
 colnames(beta_df_NL)[1] <- "BdifBhat"
 colnames(beta_df_NL)[2] <- "Morans_I"
+
+beta_df_SR <- data.frame(matrix(ncol=2, nrow=total_iterations))
+colnames(beta_df_SR)[1] <- "BdifBhat"
+colnames(beta_df_SR)[2] <- "Morans_I"
+
+beta_df_SF <- data.frame(matrix(ncol=2, nrow=total_iterations))
+colnames(beta_df_SF)[1] <- "BdifBhat"
+colnames(beta_df_SF)[2] <- "Morans_I"
+
+beta_df_PFE <- data.frame(matrix(ncol=2, nrow=total_iterations))
+colnames(beta_df_PFE)[1] <- "BdifBhat"
+colnames(beta_df_PFE)[2] <- "Morans_I"
 
 it_cnt = 1
 while (it_cnt < (total_iterations+1))
@@ -66,14 +89,10 @@ while (it_cnt < (total_iterations+1))
   {
     #Simulate the field (n is number of fields we want.  Here we create 2.)
     #These represent an example "outcome", and "control".
-    z <- RFsimulate(model, x, x, n=4)
+    z <- RFsimulate(model, x, x, n=5)
     z.SPDF <- as(z, 'SpatialPolygonsDataFrame')
     
-    t <- RFsimulate(model, x, x, n=1)
-    t.SPDF <- as(t, 'SpatialPolygonsDataFrame')
-    
     f.SPDF = z.SPDF
-    f.SPDF@data[5:7]=data.frame(t.SPDF)
     
   }
   
@@ -104,10 +123,8 @@ while (it_cnt < (total_iterations+1))
   colnames(f.SPDF@data)[4] <- "RandomFieldB"
   colnames(f.SPDF@data)[5] <- "Treatment"
   
-  #Redefine our Treatment as contingent upon a control and a random field.
-  
-  
-  f.SPDF@data["Treatment"] = f.SPDF@data["ControlA"] + f.SPDF@data["RandomFieldA"]
+  #Redefine our Control as contingent upon a Treatment and a random field.
+  f.SPDF@data["ControlA"] = f.SPDF@data["Treatment"] + f.SPDF@data["RandomFieldA"]
   
   #Scale data to calculate treatment binary.
   f.SPDF@data <- data.frame(lapply(f.SPDF@data, function(x) scale(x)))
@@ -123,7 +140,7 @@ while (it_cnt < (total_iterations+1))
   #--------------------------------------------------------------------------
   #Constructing weights matrices and creating data from SLRM
   #--------------------------------------------------------------------------
-  
+  #Determine the treatment = covariate + random field.
   #Neighbor weights sum to 1 for each unit (style=W) to avoid oddities in edge cases, 
   #Neighbor is "queens", or any touching unit at one lag.
   f.NB = poly2nb(f.SPDF)
@@ -177,17 +194,24 @@ while (it_cnt < (total_iterations+1))
   
   
   #Convert the Treatment to a Binary 0/1
+  #Median
   f.SPDF@data$Treatment[which(f.SPDF@data$Treatment > 0)] <- 1 
   f.SPDF@data$Treatment[which(f.SPDF@data$Treatment == 0)] <- 1 
   f.SPDF@data$Treatment[which(f.SPDF@data$Treatment < 0)] <- 0 
   
+  if(PSM_routine == "lm")
+  {
   PSM_model <- lm(Treatment ~ ControlA, f.SPDF@data)
-  
+  }
+  if(PSM_routine == "sl")
+  {
+  PSM_model <- lagsarlm(Treatment ~ ControlA, data=f.SPDF@data, f.W)
+  }
   #plot(f.SPDF@data$Treatment, f.SPDF@data$ControlA)
   #abline(PSM_model)
   
   #Need to save fitted PSM results...
-  f.SPDF@data["PSM"] <- predict(PSM_model, f.SPDF@data)
+  f.SPDF@data["PSM"] <- predict(PSM_model, f.SPDF@data, f.W)
   
   #Pre PSM Balance
   describeBy(f.SPDF@data, group=f.SPDF@data$Treatment)
@@ -271,7 +295,7 @@ while (it_cnt < (total_iterations+1))
   }
   
   #Calculate the Spatial Euclidean Distance for Each Pair to contrast to PSM NN distance.
-  m.SPDF['Euclidean_distance'] <- -1
+
   for (j in 1:length(m.SPDF))
   {
     #Select the pair
@@ -281,18 +305,16 @@ while (it_cnt < (total_iterations+1))
     
     #Calculate the distance
     d.EUC = dist(temp.SPDF@data, method="euclidean")[[1]]
-    m.SPDF@data$Euclidean_distance[[j]] <- d.EUC
+    m.SPDF@data$Euclidean_distance[j] <- d.EUC
     
   }
   
-  dist.DF <- m.SPDF@data
-  dist.DF <- dist.DF[dist.DF$PSM_distance >0 ,]
-  
+
   title = paste("Moran's I:",round(mI[[3]][[1]],3),"rho:",round(rho,3))
-  dist_model <- lm(PSM_distance ~ Euclidean_distance, dist.DF)
+  dist_model <- lm(PSM_distance ~ Euclidean_distance, m.SPDF@data)
   if(verbose == 1)
   {
-    plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
+    plot(m.SPDF@data$Euclidean_distance, m.SPDF@data$PSM_distance, main=title)
     abline(dist_model)
   }
   
@@ -303,20 +325,22 @@ while (it_cnt < (total_iterations+1))
   #Ludicrously simple for now, need to complicate:
   #Keep matches that are less than mean difference - may want to change this later.
   #------------------------------
-  describe(dist.DF$PSM_distance)
+  describe(m.SPDF@data$PSM_distance)
   #median.PSM = median(dist.DF$PSM_distance)
-  mean.PSM = describe(dist.DF$PSM_distance)[3][[1]]
+  median.PSM = describe(m.SPDF@data$PSM_distance)[5][[1]]
   
-  dist.DF <- dist.DF[dist.DF$PSM_distance < mean.PSM ,]
-  
+  if(PSM_drop_disab == 0)
+  {
+  m.SPDF <- m.SPDF[m.SPDF@data$PSM_distance < median.PSM ,]
+  }
   #Check our new PSM Balance:
-  describeBy(dist.DF, group=dist.DF$Treatment)
+  describeBy(m.SPDF@data, group=m.SPDF@data$Treatment)
   
   #Plot it:
-  dist_model <- lm(PSM_distance ~ Euclidean_distance, dist.DF)
+  dist_model <- lm(PSM_distance ~ Euclidean_distance, m.SPDF@data)
   if(verbose == 1)
   {
-    plot(dist.DF$Euclidean_distance, dist.DF$PSM_distance, main=title)
+    plot(m.SPDF@data$Euclidean_distance, m.SPDF@data$PSM_distance, main=title)
     abline(dist_model)
   }
   
@@ -324,24 +348,64 @@ while (it_cnt < (total_iterations+1))
   
   #In the DGN, both of beta's are equal to 1, with an intercept of 0.
   #use a linear model to estimate our beta in the NO lag case:
-  post_psm_model_noLag = lm(yiA ~ Treatment + ControlA, dist.DF)
+  post_psm_model_noLag = lm(yiA ~ Treatment + ControlA, m.SPDF@data)
   noLag_Treatment_beta = summary(post_psm_model_noLag)[4][[1]][2]
   noLag_Control_beta = summary(post_psm_model_noLag)[4][[1]][3]
   
-  post_psm_model_Lag = lm(yiB ~ Treatment + ControlA, dist.DF)
+  #Linear model estimate in the lag case:
+  post_psm_model_Lag = lm(yiB ~ Treatment + ControlA, m.SPDF@data)
   Lag_Treatment_beta = summary(post_psm_model_Lag)[4][[1]][2]
   Lag_Control_beta = summary(post_psm_model_Lag)[4][[1]][3]
+  
+  #Spatial Regression (Y lag) in the lag case:
+  #Note: when we construct the variable, we use a queens lag.
+  #However, when we sample we don't always have neighbors.
+  #Two choices: queens lag with neighborless as 0s
+  dist.NB = poly2nb(m.SPDF)
+  
+  #or, nearest neighbor for K NN.
+  #coords <- coordinates(m.SPDF)
+  #dist.NB = knn2nb(knearneigh(coords,k=3))
+  
+  dist.W = nb2listw(dist.NB, style='W', zero.policy=TRUE)
+  post_psm_model_Lag_SR = lagsarlm(yiB ~ Treatment + ControlA, data=m.SPDF@data, dist.W, zero.policy=TRUE)
+  SR_Lag_Treatment_beta = summary(post_psm_model_Lag_SR)[3][[1]][[2]]
+  
+  #Spatial Filter Model
+  post_psm_model_Lag_Eigen = SpatialFiltering(yiB ~ Treatment + ControlA, data=m.SPDF@data, nb=dist.NB, zero.policy=TRUE, ExactEV=TRUE)
+  post_psm_model_Lag_SF = lm(yiB ~ Treatment + ControlA +fitted(post_psm_model_Lag_Eigen), m.SPDF@data)
+  Lag_Treatment_beta_SF = summary(post_psm_model_Lag_SF )[4][[1]][2]
+  Lag_Control_beta_SF = summary(post_psm_model_Lag_SF )[4][[1]][3]
+  
+  #Pairs Fixed Effects Model
+  post_psm_model_Lag_PFE = lm(yiB ~ Treatment + ControlA + factor(match), m.SPDF@data)
+  Lag_Treatment_beta_PFE = summary(post_psm_model_Lag_PFE)[4][[1]][2]
+  Lag_Control_beta_PFE = summary(post_psm_model_Lag_PFE)[4][[1]][3]
   
   #final elements to record:
   #Different in Treatment Effect Beta's from lagged DGN
   BdifBhat = 1 - Lag_Treatment_beta
-  
   BdifBhat_NL = 1 - noLag_Treatment_beta
+  BdifBhat_SR = 1 - SR_Lag_Treatment_beta
+  BdifBhat_SF = 1 - Lag_Treatment_beta_SF
+  BdifBhat_PFE = 1 - Lag_Treatment_beta_PFE
   
   #Save values from iteration
   beta_df["BdifBhat"][it_cnt,] = BdifBhat
   beta_df["Rho"][it_cnt,] = rho
   beta_df["Morans_I"][it_cnt,] = mI[[3]][[1]]
+  
+  #SR
+  beta_df_SR["BdifBhat"][it_cnt,] = BdifBhat_SR
+  beta_df_SR["Morans_I"][it_cnt,] = mI[[3]][[1]]
+  
+  #Spatial Filter
+  beta_df_SF["BdifBhat"][it_cnt,] = BdifBhat_SF
+  beta_df_SF["Morans_I"][it_cnt,] = mI[[3]][[1]]
+  
+  #Pairs Fixed Effects
+  beta_df_PFE["BdifBhat"][it_cnt,] = BdifBhat_PFE
+  beta_df_PFE["Morans_I"][it_cnt,] = mI[[3]][[1]]
   
   #Also save the "non lagged" data, to benchmark.  
   beta_df_NL["BdifBhat"][it_cnt,] = BdifBhat_NL
@@ -362,6 +426,9 @@ if (verbose == 1)
 {
   plot3d(beta_df, cex=.1)
   
-  plot(beta_df$Morans_I, beta_df$BdifBhat, cex=.1)
-  points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="red", cex=.1)
+  plot(beta_df$Morans_I, beta_df$BdifBhat, col="red", cex=.3)
+  points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="black", cex=.3)
+  points(beta_df_SR$Morans_I, beta_df_SR$BdifBhat, col="green", cex=.3)
+  points(beta_df_SF$Morans_I, beta_df_SF$BdifBhat, col="orange", cex=.3)
+  points(beta_df_PFE$Morans_I, beta_df_PFE$BdifBhat, col="blue", cex=.3)
 }
