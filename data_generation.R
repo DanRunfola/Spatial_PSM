@@ -40,11 +40,9 @@ verbose = 0
 #lm - a traditional lm()
 #sl - a slrm with the weights matrix defined in the same way as the DGP.
 PSM_routine = "sl"
-OLS_PSM = 1
-Spatial_Lag_PSM = 0
 
 #Disable PSM dropping based on distance?
-PSM_drop_disab = 1
+PSM_drop_disab = 0
 
 #----------------------------------
 #----------------------------------
@@ -372,10 +370,16 @@ while (it_cnt < (total_iterations+1))
   SR_Lag_Treatment_beta = summary(post_psm_model_Lag_SR)[3][[1]][[2]]
   
   #Spatial Filter Model
-  post_psm_model_Lag_Eigen = SpatialFiltering(yiB ~ Treatment + ControlA, data=m.SPDF@data, nb=dist.NB, zero.policy=TRUE, ExactEV=TRUE)
-  post_psm_model_Lag_SF = lm(yiB ~ Treatment + ControlA +fitted(post_psm_model_Lag_Eigen), m.SPDF@data)
-  Lag_Treatment_beta_SF = summary(post_psm_model_Lag_SF )[4][[1]][2]
-  Lag_Control_beta_SF = summary(post_psm_model_Lag_SF )[4][[1]][3]
+  #Linear (not appropriate for binary or non-normal responses of any kind)
+  #post_psm_model_Lag_Eigen = SpatialFiltering(yiB ~ Treatment + ControlA, data=m.SPDF@data, nb=dist.NB, zero.policy=TRUE, ExactEV=TRUE)
+  #post_psm_model_Lag_SF = lm(yiB ~ Treatment + ControlA +fitted(post_psm_model_Lag_Eigen), m.SPDF@data)
+  
+  #GLM:  
+  post_psm_model_Lag_Eigen = ME(yiB ~ Treatment + ControlA, data=m.SPDF@data, listw=dist.W, alpha=0.5)
+  post_psm_model_Lag_SF = glm(yiB ~ Treatment + ControlA + fitted(post_psm_model_Lag_Eigen), data=m.SPDF@data)
+  
+  Lag_Treatment_beta_SF = summary(post_psm_model_Lag_SF )$coefficients[2]
+  Lag_Control_beta_SF = summary(post_psm_model_Lag_SF )$coefficients[3]
   
   #Pairs Fixed Effects Model
   post_psm_model_Lag_PFE = lm(yiB ~ Treatment + ControlA + factor(match), m.SPDF@data)
@@ -426,9 +430,9 @@ if (verbose == 1)
 {
   plot3d(beta_df, cex=.1)
   
-  plot(beta_df$Morans_I, beta_df$BdifBhat, col="red", cex=.3)
+  plot(beta_df$Morans_I, beta_df$BdifBhat, col="red", cex=.3, xlim=c(-0.8, 1), ylim=c(-0.8, 1.5))
   points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="black", cex=.3)
-  points(beta_df_SR$Morans_I, beta_df_SR$BdifBhat, col="green", cex=.3)
-  points(beta_df_SF$Morans_I, beta_df_SF$BdifBhat, col="orange", cex=.3)
+  points(beta_df_SR$Morans_I, beta_df_SR$BdifBhat, col="orange", cex=.3)
+  points(beta_df_SF$Morans_I, beta_df_SF$BdifBhat, col="green", cex=.3)
   points(beta_df_PFE$Morans_I, beta_df_PFE$BdifBhat, col="blue", cex=.3)
 }
