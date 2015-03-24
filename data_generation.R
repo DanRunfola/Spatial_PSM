@@ -430,9 +430,9 @@ if (verbose == 1)
 {
   plot3d(beta_df, cex=.1)
   
-  plot(beta_df$Morans_I, beta_df$BdifBhat, col="red", cex=.3, xlim=c(-0.8, 1), ylim=c(-0.8, 1.5))
-  points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="black", cex=.3)
-  points(beta_df_SR$Morans_I, beta_df_SR$BdifBhat, col="orange", cex=.3)
-  points(beta_df_SF$Morans_I, beta_df_SF$BdifBhat, col="green", cex=.3)
-  points(beta_df_PFE$Morans_I, beta_df_PFE$BdifBhat, col="blue", cex=.3)
+  plot(beta_df$Morans_I, beta_df$BdifBhat, col="red", cex=.4, xlim=c(-0.8, 1), ylim=c(-0.8, 1.5))
+  points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="black", cex=.4)
+  points(beta_df_SR$Morans_I, beta_df_SR$BdifBhat, col="orange", cex=.4)
+  points(beta_df_SF$Morans_I, beta_df_SF$BdifBhat, col="green", cex=.4)
+  points(beta_df_PFE$Morans_I, beta_df_PFE$BdifBhat, col="blue", cex=.4)
 }
