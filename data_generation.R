@@ -24,10 +24,10 @@ library(rgl) #3D Scatterplots.  Note this requires X11 on Ubuntu, see below comm
 cov_spatial_effects = 0
 
 #How big the field will be
-x <- seq(1, 10, 1)
+x <- seq(1, 30, 1)
 
 #How many iterations to perform
-total_iterations = 10
+total_iterations = 1000
 
 #Do we create maps? 1 = Yes.
 maps = 0
@@ -224,8 +224,8 @@ while (it_cnt < (total_iterations+1))
   #Need to save fitted PSM results... spatial lag format
   f.SPDF@data["PSM"] <- predict(PSM_model, f.SPDF@data, f.W)
   }
-  #plot(f.SPDF@data$Treatment, f.SPDF@data$ControlA)
-  #abline(PSM_model)
+  plot(f.SPDF@data$Treatment, f.SPDF@data$ControlA)
+  abline(PSM_model)
   
 
   
@@ -358,7 +358,7 @@ while (it_cnt < (total_iterations+1))
   }
   #Check our new PSM Balance:
   describeBy(m.SPDF@data, group=m.SPDF@data$Treatment)
-  debug_var = 5
+
   #Plot it:
   dist_model <- lm(PSM_distance ~ Euclidean_distance, m.SPDF@data)
   if(verbose == 1)
@@ -456,7 +456,7 @@ if (verbose == 1)
 {
   plot3d(beta_df, cex=.1)
   
-  plot(beta_df$Morans_I, beta_df$BdifBhat, col="red", cex=.4, xlim=c(-0, 1), ylim=c(-10, 10))
+  plot(beta_df$Morans_I, beta_df$BdifBhat, col="red", cex=.4, xlim=c(-0, 1), ylim=c(-1, 1))
   points(beta_df_NL$Morans_I, beta_df_NL$BdifBhat, col="black", cex=.4)
   points(beta_df_SR$Morans_I, beta_df_SR$BdifBhat, col="orange", cex=.4)
   #points(beta_df_SF$Morans_I, beta_df_SF$BdifBhat, col="green", cex=.4)
