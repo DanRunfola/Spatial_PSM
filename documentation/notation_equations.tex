@@ -17,8 +17,13 @@
 \textbf{T} $\equiv$ One-dimensional vector containing the treatment status for each unit of observation; i.e., if a project to decrease deforestation existed at that location.  $T_{i}$ represents the treatment status at unit of observation \textit{i}. \vspace{0.25cm}
 
 \end{flushleft}
-A data generation process is run multiple times to examine the impact of spatial spillover in any of the three elements (\textbf{Y,X,T}) defined above in causal inferential designs seeking to isolate the impact of a treatment on a given outcome of interest.
-
+Here, we  examine the impact of spatial spillover in any of the three elements \textbf{Y,X,T} in matching methods for causal inference.  Spatial spillover can be simply understood as the presence of correlation between measurements in neighboring units.  For example:
+\begin{enumerate}
+\item \textbf{Y} - in the case of deforestation,  communities that practice lumber harvesting as a livelihoods strategy may suggest that to neighboring communities, or even enter into neighboring lands to conduct lumber operations.
+\item \textbf{X} - population could very reasonably be inferred to be a driver of deforestation; neighbouring communities may have similar populations due to cultural demographic characteristics.
+\item \textbf{T} - a treatment - i.e., paying a community to prevent deforestation could result in an increased likelihood of funding neighboring communities due to word-of-mouth, or treatment designs which drive down costs by reducing travel times.
+\end{enumerate}
+These are just illustrative examples, but highlight the potential challenge that modeling spillover effects can cause.  
 
 \begin{equation}
 $$X$$
