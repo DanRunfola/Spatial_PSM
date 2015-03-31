@@ -3,7 +3,7 @@
 #(b) the data itself,
 #(c) the Moran's I of the data.
 
-#Small notes:
+#Small notes: 
 #View(f.SPDF@data)  - allows you to view (capital V) the attributes table within a shapefile, where
 #f.SPDF is the shapefile
 
