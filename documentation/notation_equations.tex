@@ -59,7 +59,7 @@ Y_{i,a} = 1.0 * T_{i} + 1.0 * X_{1,i}
 Where $Y_{i,a}$ represents the outcome of the data generation process \textit{a} at location \textit{i}.  In this model, spatial covariance in $Y_{i,a}$ will be directly reflected by the covariance in \textbf{T} and \textbf{X}.\\
 
 In order to simulate the condition in which there are spillovers present in $Y_{i,a}$, but \textit{not} in \textbf{T} and \textbf{X}, the gaussian function used to generate the spatial fields in equations 1 and 2 can be set to 0 (i.e., no spatial covariance).  Equation 4 is then applied to ensure covariance in Y.  
-\begin{equation}
+\begin{equation} 
 Y_{i,b} = Y_{i,a} + \rho \boldsymbol {W}Y_{i,a}
 \end{equation}
 Where $\rho$ is randomly defined between 0.1 and 10.  Note Equation 4 can also be applied when both \textbf{T} and \textbf{X} have spatial covariance structures.  This will ensure Y has a stronger degree of covariance than either independently. Equation 4 can also be written as:
