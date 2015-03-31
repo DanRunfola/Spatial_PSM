@@ -1,4 +1,4 @@
-\documentclass[10pt,a4paper]{report}
+\documentclass[10pt,a3paper]{report}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
 \usepackage{amsfonts}
@@ -16,19 +16,58 @@
 
 \textbf{T} $\equiv$ One-dimensional vector containing the treatment status for each unit of observation; i.e., if a project to decrease deforestation existed at that location.  $T_{i}$ represents the treatment status at unit of observation \textit{i}. \vspace{0.25cm}
 
+\textbf{W} $\equiv$ i by i matrix which represents the neighboring geographic units of any given spatial unit 1.  Frequently a binary specification (0/1) predicated upon contiguity. 
+\vspace{0.25cm}
+
+\textbf{SF(g)} $\equiv$ a randomly generated spatial field with a gaussian covariance function \textit{g}.
+\vspace{0.1cm}
+
 \end{flushleft}
+\underline{Introduction}\\
 Here, we  examine the impact of spatial spillover in any of the three elements \textbf{Y,X,T} in matching methods for causal inference.  Spatial spillover can be simply understood as the presence of correlation between measurements in neighboring units.  For example:
 \begin{enumerate}
 \item \textbf{Y} - in the case of deforestation,  communities that practice lumber harvesting as a livelihoods strategy may suggest that to neighboring communities, or even enter into neighboring lands to conduct lumber operations.
 \item \textbf{X} - population could very reasonably be inferred to be a driver of deforestation; neighbouring communities may have similar populations due to cultural demographic characteristics.
 \item \textbf{T} - a treatment - i.e., paying a community to prevent deforestation could result in an increased likelihood of funding neighboring communities due to word-of-mouth, or treatment designs which drive down costs by reducing travel times.
 \end{enumerate}
-These are just illustrative examples, but highlight the potential challenge that modeling spillover effects can cause.  
+These are just illustrative examples, but highlight  possible modeling contexts in which spatial spillover can occur. To account for these spillovers, traditional spatial modeling approaches introduce the \textbf{W} spatial weights matrix, comprised of values which seek to represent the strength of spatial connections between units.  This weights matrix is frequently incorporated on the right hand side of the equation as \textbf{WY}, representing the spillover in the response variable.  Other's have recently advocated for integrating \textbf{WX} as either exogenous or endogenous spatial terms.  Taking any of these approaches for causal identification comes with a number of concerns:
+\begin{enumerate}
+\item \textbf{Omitted Spatial Variables} - the lagged \textbf{Y} term could be significant only because of omitted spatially dependent variables (\textbf{WX}), incorrectly leading one to infer that spatial spillover in the Y exists in incorrectly specified models. 
 
+\item \textbf{Endogenous Terms and Simultaneity} - In using the lagged \textbf{Y}, model endogeneity can occur due to the simultaneity issues - i.e., both \textbf{Y} and \textbf{WY} are codetermined.
+
+\item ...More as we're able to...
+
+\end{enumerate}
+
+To illustrate the impact of these concerns, we use a Monte Carlo framework to simulate data with a known, but randomly varied, degree of spatial covariance in \textbf{Y, X} and \textbf{T}.  In each case, we produce a 30x30 grid (900 total observations) of data using the known data generation process, and then attempt to solve for the selected coefficients using existing causal inferential modeling designs.  Each modeling approach is examined according to its effectiveness in parameter estimation as contrasted to a measure of first-order spatial autocorrelation, the Moran's I.\\
+
+\underline{Models}\\
+Equations 1 and 2 describe the data generation for both a simulated treatment and control variable, both of which are drawn from a random spatial field with a defined gaussian covariance structure.
 \begin{equation}
-$$X$$
+\boldsymbol{X_{1}} = 1.0 * SF(g)
+\end{equation}
+\begin{equation}
+\boldsymbol{T} = X_{1} + SF(g)
 \end{equation}
 
+Equation 3 describes a baseline model in which data is generated with a random (or controlled) degree of spatial covariance in both   \textbf{T} and \textbf{X}.
 
+\begin{equation}
+Y_{i,a} = 1.0 * T_{i} + 1.0 * X_{1,i}
+\end{equation}
+Where $Y_{i,a}$ represents the outcome of the data generation process \textit{a} at location \textit{i}.  In this model, spatial covariance in $Y_{i,a}$ will be directly reflected by the covariance in \textbf{T} and \textbf{X}.\\
+
+In order to simulate the condition in which there are spillovers present in $Y_{i,a}$, but \textit{not} in \textbf{T} and \textbf{X}, the gaussian function used to generate the spatial fields in equations 1 and 2 can be set to 0 (i.e., no spatial covariance).  Equation 4 is then applied to ensure covariance in Y.  
+\begin{equation}
+Y_{i,b} = Y_{i,a} + \rho \boldsymbol {W}Y_{i,a}
+\end{equation}
+Where $\rho$ is randomly defined between 0.1 and 10.  Note Equation 4 can also be applied when both \textbf{T} and \textbf{X} have spatial covariance structures.  This will ensure Y has a stronger degree of covariance than either independently. Equation 4 can also be written as:
+
+\begin{equation}
+Y_{i,b} = (1.0 * T_{i} + 1.0 * X_{1,i}) + \rho \boldsymbol {W}(1.0 * T_{i} + 1.0 * X_{1,i})
+\end{equation}
+
+Using these two sets of data ($Y_{i,a}$ and $Y_{i,b}$) we then conduct a PSM matching procedure and attempt to re-estimate the coefficients using a linear and spatial model.  We contrast the predicted beta coefficeint on the Treatment (\textbf{T}) to "1", our assigned value in the DGP.
 
 \end{document}
