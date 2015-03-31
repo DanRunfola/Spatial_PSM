@@ -9,7 +9,7 @@
 
 #install.packages("RandomFields") - how to install a library you're missing.  Only done once, just like
 #a module in STATA.
-
+###
 library(RandomFields) #Generating Random Spatial Fields
 library(sp)    #Spatial data handling
 library(spdep) #Spatial Lag Model Fitting
